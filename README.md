@@ -27,10 +27,28 @@ CrowdSec Metrics Dashboard is built using Node.js and utilizes Docker for contai
 - Node.js 16+
 - CrowdSec installed and running
 - Docker (if using containerized CrowdSec)
+- Sudo access
 
 ## 🚀 Quick Start Guide
 
-### Installation
+### Automatic Installation
+```bash
+# Clone the repository
+git clone https://github.com/fertigq/crowdsecmetrics.git
+
+# Run the installation script
+cd crowdsecmetrics
+sudo ./install.sh
+```
+
+The installation script will:
+- Prompt for dashboard port
+- Detect server IP
+- Install dependencies
+- Configure firewall
+- Set up systemd service
+
+### Manual Installation
 ```bash
 # Clone the repository
 git clone https://github.com/fertigq/crowdsecmetrics.git
@@ -40,28 +58,25 @@ cd crowdsecmetrics
 npm install
 
 # Configure environment
-cp example.env .env
+cp .env.example .env
 nano .env  # Customize your configuration
-```
 
-### Running the Project
-```bash
-# Start the development server
-node server.js
-
-# Build for production
+# Build the project
 npm run build
 
-# Start production server
+# Start the server
 npm start
 ```
 
 ## ⚡ Configuration Options
 Edit the `.env` file to customize:
 
-- `PORT`: Port number (default: 3456)
-- `HOST`: Host address (default: 0.0.0.0)
-- `ENVIRONMENT`: Environment settings
+- `PORT`: Dashboard port (default: 47392)
+- `HOST`: Host IP address
+- `CROWDSEC_CONTAINER`: Docker container name
+- `HOST_METRICS`: Enable host-level metrics
+- `DOCKER_METRICS`: Enable Docker metrics
+- `REFRESH_INTERVAL`: Metrics refresh rate
 
 ## 📊 Key Features
 - Real-time metrics display
@@ -74,10 +89,12 @@ Edit the `.env` file to customize:
 ### Critical Considerations
 - Ensure proper configuration of CrowdSec instance
 - Limit access to the dashboard
+- Use a firewall to restrict access
 
 ### Recommended Practices
 - Regularly update dependencies
 - Monitor system logs
+- Use strong, unique ports
 
 ## ⚠️ Precautionary Warning
 **No warranties whatsoever**
@@ -90,6 +107,7 @@ Production Use: Not recommended for mission-critical systems without thorough te
 |---------|--------|
 | Unable to connect to CrowdSec instance | Check CrowdSec instance status and configuration |
 | Dashboard not refreshing | Check auto-refresh interval and system logs |
+| Port already in use | Choose a different port during installation |
 
 ## 🤝 Contribution Guidelines
 Contributions are welcome! Please follow these steps:
