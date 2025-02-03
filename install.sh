@@ -197,13 +197,17 @@ clone_repository() {
     PROJECT_DIR=$(find_project_directory)
     log "Using project directory: $PROJECT_DIR"
     
-    # Ensure directory exists
+    # Ensure directory exists and is writable
     mkdir -p "$PROJECT_DIR"
     
-    # If directory is empty, clone the repository
-    if [ -z "$(ls -A "$PROJECT_DIR")" ]; then
+    # Check if directory is empty or contains only hidden files
+    if [ -z "$(ls -A "$PROJECT_DIR" 2>/dev/null)" ]; then
         log "Cloning CrowdSec Metrics Dashboard repository..."
-        git clone https://github.com/fertigq/crowdsecmetrics.git "$PROJECT_DIR" || error "Failed to clone repository"
+        git clone https://github.com/fertigq/crowdsecmetrics.git "$PROJECT_DIR" || {
+            error "Failed to clone repository. Please check your internet connection and repository URL."
+        }
+    elif [ ! -f "$PROJECT_DIR/package.json" ]; then
+        error "Project directory exists but does not contain a valid project. Please remove $PROJECT_DIR and run the installer again."
     else
         log "Using existing project directory"
     fi
@@ -214,6 +218,36 @@ clone_repository() {
     # Verify repository contents
     if [ ! -f "package.json" ]; then
         error "Invalid project directory. Missing package.json"
+    fi
+
+    # Optional: Pull latest changes if repository already exists
+    if git rev-parse --is-inside-work-tree &> /dev/null; then
+        log "Updating existing repository..."
+        git pull origin main || warning "Could not pull latest changes"
+    fi
+}
+
+# Handle npm vulnerabilities
+handle_npm_vulnerabilities() {
+    log "Checking npm package vulnerabilities..."
+    
+    # Run npm audit
+    local AUDIT_RESULT
+    AUDIT_RESULT=$(npm audit --json)
+    
+    # Check if there are vulnerabilities
+    if echo "$AUDIT_RESULT" | grep -q '"vulnerabilities":'; then
+        warning "Vulnerabilities detected in npm packages."
+        
+        # Attempt to fix vulnerabilities
+        log "Attempting to automatically fix vulnerabilities..."
+        npm audit fix --force || {
+            warning "Could not automatically fix all vulnerabilities."
+            log "Detailed vulnerability report:"
+            npm audit
+        }
+    else
+        success "No vulnerabilities found in npm packages."
     fi
 }
 
@@ -309,6 +343,9 @@ EOL
         error "Project build failed. Check your build configuration and dependencies."
     }
 
+    # Check and handle npm vulnerabilities
+    handle_npm_vulnerabilities
+
     success "Project dependencies installed and built successfully"
 }
 
@@ -317,9 +354,29 @@ configure_environment() {
     local PORT HOST
     log "Configuring environment..."
     
-    # Copy example environment file if .env doesn't exist
+    # Create .env file if it doesn't exist
     if [ ! -f .env ]; then
-        cp .env.example .env || error "Failed to create .env file"
+        log "Creating .env file..."
+        cat > .env << EOL
+# CrowdSec Metrics Dashboard Configuration
+
+# Server Configuration
+PORT=47392
+HOST=localhost
+
+# CrowdSec Configuration
+CROWDSEC_CONTAINER=crowdsec
+
+# Logging Configuration
+LOG_LEVEL=info
+
+# Security Settings
+CORS_ORIGIN=*
+
+# Optional: Additional Configuration
+# METRICS_INTERVAL=60
+# DEBUG=false
+EOL
     fi
     
     # Select port
