@@ -119,6 +119,9 @@ validate_requirements() {
         fi
     fi
 
+    # Additional development tools
+    apt-get install -y build-essential
+
     # CrowdSec check remains the same
     if ! command -v cscli &> /dev/null; then
         error "CrowdSec is not installed. Please install CrowdSec first."
@@ -141,7 +144,8 @@ install_dependencies() {
         ca-certificates \
         gnupg \
         lsb-release \
-        net-tools
+        net-tools \
+        build-essential
 
     # Additional error handling for dependency installation
     if [ $? -ne 0 ]; then
@@ -216,7 +220,55 @@ clone_repository() {
 # Install project dependencies
 install_project_dependencies() {
     log "Installing project dependencies..."
-    npm install
+    
+    # Install global dependencies
+    npm install -g postcss tailwindcss vite typescript
+
+    # Ensure configuration files exist
+    if [ ! -f "postcss.config.js" ]; then
+        log "Creating postcss.config.js..."
+        cat > postcss.config.js << EOL
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+EOL
+    fi
+
+    if [ ! -f "tailwind.config.js" ]; then
+        log "Creating tailwind.config.js..."
+        cat > tailwind.config.js << EOL
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+EOL
+    fi
+
+    # Install project dependencies with force
+    npm install --force || {
+        warning "Standard npm install failed. Attempting alternative installation..."
+        rm -rf node_modules package-lock.json
+        npm install --legacy-peer-deps
+    }
+
+    # Ensure Tailwind and PostCSS are installed
+    npm install -D postcss tailwindcss autoprefixer @vitejs/plugin-react
+
+    # Run build process with additional error handling
+    log "Building project..."
+    npm run build || {
+        error "Project build failed. Check your build configuration and dependencies."
+    }
 }
 
 # Configure environment
@@ -280,44 +332,4 @@ configure_firewall() {
     
     log "Configuring firewall..."
     if command -v ufw &> /dev/null; then
-        ufw allow "$PORT/tcp"
-    elif command -v firewall-cmd &> /dev/null; then
-        firewall-cmd --permanent --add-port="$PORT/tcp"
-        firewall-cmd --reload
-    else
-        warning "No firewall utility found. Please manually configure firewall."
-    fi
-}
-
-# Main installation process
-main() {
-    # Clear the screen for a clean installation view
-    clear
-    
-    log "🚀 CrowdSec Metrics Dashboard Installer 🚀"
-    log "----------------------------------------"
-    
-    # Run installation steps
-    check_sudo
-    detect_os
-    validate_requirements
-    install_dependencies
-    clone_repository
-    install_project_dependencies
-    configure_environment
-    setup_systemd_service
-    configure_firewall
-    
-    # Final success message
-    echo ""
-    success "Installation completed successfully!"
-    echo "Dashboard URL: http://$(grep HOST .env | cut -d '=' -f2):$(grep PORT .env | cut -d '=' -f2)"
-    echo ""
-    echo "Useful commands:"
-    echo "  View service status: systemctl status crowdsecmetrics"
-    echo "  Stop service: systemctl stop crowdsecmetrics"
-    echo "  Start service: systemctl start crowdsecmetrics"
-}
-
-# Run the main installation function
-main
+        ufw allow "$
