@@ -254,21 +254,61 @@ export default {
 EOL
     fi
 
-    # Install project dependencies with force
-    npm install --force || {
+    if [ ! -f "vite.config.ts" ]; then
+        log "Creating vite.config.ts..."
+        cat > vite.config.ts << 'EOL'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    rollupOptions: {
+      external: ['react/jsx-runtime'],
+    },
+  },
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
+})
+EOL
+    fi
+
+    # Clean npm cache and existing modules
+    npm cache clean --force
+    rm -rf node_modules package-lock.json
+
+    # Install project dependencies with comprehensive React setup
+    log "Installing core dependencies..."
+    npm install --force \
+        react@latest \
+        react-dom@latest \
+        @types/react@latest \
+        @types/react-dom@latest \
+        @vitejs/plugin-react@latest || {
         warning "Standard npm install failed. Attempting alternative installation..."
-        rm -rf node_modules package-lock.json
         npm install --legacy-peer-deps
     }
 
-    # Ensure Tailwind and PostCSS are installed
-    npm install -D postcss tailwindcss autoprefixer @vitejs/plugin-react
+    # Ensure all dependencies are installed
+    log "Installing development dependencies..."
+    npm install -D \
+        postcss \
+        tailwindcss \
+        autoprefixer \
+        @vitejs/plugin-react \
+        typescript \
+        vite
 
     # Run build process with additional error handling
     log "Building project..."
     npm run build || {
         error "Project build failed. Check your build configuration and dependencies."
     }
+
+    success "Project dependencies installed and built successfully"
 }
 
 # Configure environment
