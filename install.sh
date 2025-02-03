@@ -30,6 +30,31 @@ warning() {
     echo -e "${YELLOW}[WARNING]${NC} $*"
 }
 
+# Find project directory
+find_project_directory() {
+    local SCRIPT_DIR
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    
+    # Check if current directory contains project files
+    if [ -f "$SCRIPT_DIR/package.json" ] && grep -q "crowdsecmetrics" "$SCRIPT_DIR/package.json"; then
+        echo "$SCRIPT_DIR"
+        return 0
+    fi
+
+    # Try common installation directories
+    local COMMON_DIRS=("/opt/crowdsecmetrics" "/usr/local/crowdsecmetrics" "$HOME/crowdsecmetrics")
+    
+    for dir in "${COMMON_DIRS[@]}"; do
+        if [ -d "$dir" ] && [ -f "$dir/package.json" ] && grep -q "crowdsecmetrics" "$dir/package.json"; then
+            echo "$dir"
+            return 0
+        fi
+    done
+
+    # If no directory found, use a default
+    echo "/opt/crowdsecmetrics"
+}
+
 # Check for root/sudo permissions
 check_sudo() {
     if [ "$EUID" -ne 0 ]; then
@@ -115,7 +140,8 @@ install_dependencies() {
         software-properties-common \
         ca-certificates \
         gnupg \
-        lsb-release
+        lsb-release \
+        net-tools
 
     # Additional error handling for dependency installation
     if [ $? -ne 0 ]; then
@@ -163,18 +189,28 @@ detect_server_ip() {
 
 # Clone the repository
 clone_repository() {
-    local PROJECT_DIR="/opt/crowdsecmetrics"
-    log "Cloning CrowdSec Metrics Dashboard repository..."
+    local PROJECT_DIR
+    PROJECT_DIR=$(find_project_directory)
+    log "Using project directory: $PROJECT_DIR"
     
-    # Remove existing directory if it exists
-    if [ -d "$PROJECT_DIR" ]; then
-        warning "Existing project directory found. Removing..."
-        rm -rf "$PROJECT_DIR"
+    # Ensure directory exists
+    mkdir -p "$PROJECT_DIR"
+    
+    # If directory is empty, clone the repository
+    if [ -z "$(ls -A "$PROJECT_DIR")" ]; then
+        log "Cloning CrowdSec Metrics Dashboard repository..."
+        git clone https://github.com/fertigq/crowdsecmetrics.git "$PROJECT_DIR" || error "Failed to clone repository"
+    else
+        log "Using existing project directory"
     fi
     
-    mkdir -p "$PROJECT_DIR"
-    git clone https://github.com/fertigq/crowdsecmetrics.git "$PROJECT_DIR"
-    cd "$PROJECT_DIR"
+    # Change to project directory
+    cd "$PROJECT_DIR" || error "Unable to change to project directory"
+    
+    # Verify repository contents
+    if [ ! -f "package.json" ]; then
+        error "Invalid project directory. Missing package.json"
+    fi
 }
 
 # Install project dependencies
@@ -188,8 +224,10 @@ configure_environment() {
     local PORT HOST
     log "Configuring environment..."
     
-    # Copy example environment file
-    cp .env.example .env
+    # Copy example environment file if .env doesn't exist
+    if [ ! -f .env ]; then
+        cp .env.example .env || error "Failed to create .env file"
+    fi
     
     # Select port
     PORT=$(select_port)
@@ -209,7 +247,8 @@ configure_environment() {
 
 # Setup systemd service
 setup_systemd_service() {
-    local PROJECT_DIR="/opt/crowdsecmetrics"
+    local PROJECT_DIR
+    PROJECT_DIR=$(find_project_directory)
     log "Setting up systemd service..."
     
     cat > /etc/systemd/system/crowdsecmetrics.service << EOL
