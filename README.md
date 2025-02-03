@@ -33,8 +33,8 @@ CrowdSec Metrics Dashboard is built using Node.js and utilizes Docker for contai
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/crowdsec-dashboard.git
-cd crowdsec-dashboard
+git clone https://github.com/fertigq/crowdsecmetrics.git
+cd crowdsecmetrics
 
 # Install dependencies
 npm install
