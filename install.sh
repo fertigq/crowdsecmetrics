@@ -264,7 +264,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      external: ['react/jsx-runtime'],
+      external: ['react/jsx-runtime', 'lucide-react'],
     },
   },
   resolve: {
@@ -280,21 +280,22 @@ EOL
     npm cache clean --force
     rm -rf node_modules package-lock.json
 
-    # Install project dependencies with comprehensive React setup
-    log "Installing core dependencies..."
-    npm install --force \
-        react@latest \
-        react-dom@latest \
-        @types/react@latest \
-        @types/react-dom@latest \
-        @vitejs/plugin-react@latest || {
-        warning "Standard npm install failed. Attempting alternative installation..."
-        npm install --legacy-peer-deps
-    }
+    # Install dependencies with legacy peer deps to resolve conflicts
+    log "Installing dependencies with legacy peer resolution..."
+    npm install --legacy-peer-deps \
+        react@18.2.0 \
+        react-dom@18.2.0 \
+        lucide-react@0.292.0 \
+        @types/react@18.2.48 \
+        @types/react-dom@18.2.18 \
+        @vitejs/plugin-react@4.2.1 \
+        cors@2.8.5 \
+        dotenv@16.3.1 \
+        express@4.18.2
 
     # Ensure all dependencies are installed
     log "Installing development dependencies..."
-    npm install -D \
+    npm install -D --legacy-peer-deps \
         postcss \
         tailwindcss \
         autoprefixer \
