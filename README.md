@@ -68,6 +68,38 @@ npm run build
 npm start
 ```
 
+## 🗑️ Uninstallation
+
+### Automatic Uninstallation
+```bash
+# Navigate to the project directory
+cd /opt/crowdsecmetrics
+
+# Run the uninstall script with sudo
+sudo ./uninstall.sh
+```
+
+### What the Uninstaller Does
+- Stops and disables the systemd service
+- Removes firewall rules
+- Deletes the project directory
+- Cleans up any global npm packages
+
+### Manual Cleanup
+If you want to completely remove all traces:
+```bash
+# Remove systemd service
+sudo systemctl stop crowdsecmetrics
+sudo systemctl disable crowdsecmetrics
+sudo rm /etc/systemd/system/crowdsecmetrics.service
+
+# Remove project directory
+sudo rm -rf /opt/crowdsecmetrics
+
+# Remove firewall rules (adjust as needed)
+sudo ufw delete allow 47392/tcp  # Replace with your actual port
+```
+
 ## ⚡ Configuration Options
 Edit the `.env` file to customize:
 
