@@ -153,9 +153,14 @@ install_dependencies() {
     fi
 }
 
-# Select and validate port
-select_port() {
-    local PORT
+# Configure environment
+configure_environment() {
+    local PORT HOST CROWDSEC_CONTAINER LOG_LEVEL CORS_ORIGIN
+
+    log "🔧 Configuring CrowdSec Metrics Dashboard Environment 🔧"
+    log "Please provide configuration details:"
+
+    # Port Configuration
     while true; do
         read -p "Enter dashboard port (default: 47392): " PORT
         PORT=${PORT:-47392}
@@ -174,21 +179,73 @@ select_port() {
         if nc -z localhost "$PORT" 2>/dev/null; then
             warning "Port $PORT is already in use. Please choose another."
         else
-            echo "$PORT"
             break
         fi
     done
-}
 
-# Detect server IP
-detect_server_ip() {
-    local SERVER_IP
-    # Try to get the primary network interface IP
-    SERVER_IP=$(hostname -I | awk '{print $1}')
-    
-    read -p "Enter server IP (default: $SERVER_IP): " USER_IP
-    SERVER_IP=${USER_IP:-$SERVER_IP}
-    echo "$SERVER_IP"
+    # Host Configuration
+    read -p "Enter server host (default: localhost): " HOST
+    HOST=${HOST:-localhost}
+
+    # CrowdSec Container Name
+    read -p "Enter CrowdSec container name (default: crowdsec): " CROWDSEC_CONTAINER
+    CROWDSEC_CONTAINER=${CROWDSEC_CONTAINER:-crowdsec}
+
+    # Log Level
+    log "Select Log Level:"
+    select LOG_LEVEL in "debug" "info" "warn" "error"; do
+        LOG_LEVEL=${LOG_LEVEL:-info}
+        break
+    done
+
+    # CORS Origin
+    read -p "Enter CORS origin (default: *): " CORS_ORIGIN
+    CORS_ORIGIN=${CORS_ORIGIN:-*}
+
+    # Create .env file
+    local PROJECT_DIR
+    PROJECT_DIR=$(find_project_directory)
+    local ENV_PATH="$PROJECT_DIR/.env"
+
+    log "Creating .env file at $ENV_PATH..."
+    cat > "$ENV_PATH" << EOL
+# CrowdSec Metrics Dashboard Configuration
+
+# Server Configuration
+PORT=$PORT
+HOST=$HOST
+
+# CrowdSec Configuration
+CROWDSEC_CONTAINER=$CROWDSEC_CONTAINER
+
+# Logging Configuration
+LOG_LEVEL=$LOG_LEVEL
+
+# Security Settings
+CORS_ORIGIN=$CORS_ORIGIN
+
+# Optional: Additional Configuration
+# METRICS_INTERVAL=60
+# DEBUG=false
+EOL
+
+    # Verify file creation
+    if [ ! -f "$ENV_PATH" ]; then
+        error "Failed to create .env file at $ENV_PATH"
+    fi
+
+    # Set proper permissions
+    chmod 644 "$ENV_PATH"
+
+    # Display configuration summary
+    log "📋 Configuration Summary:"
+    log "  Dashboard Port: $PORT"
+    log "  Host: $HOST"
+    log "  CrowdSec Container: $CROWDSEC_CONTAINER"
+    log "  Log Level: $LOG_LEVEL"
+    log "  CORS Origin: $CORS_ORIGIN"
+
+    success "Environment configured successfully"
 }
 
 # Clone the repository
@@ -349,79 +406,6 @@ EOL
     success "Project dependencies installed and built successfully"
 }
 
-# Configure environment
-configure_environment() {
-    local PORT HOST
-    log "Configuring environment..."
-    
-    # Ensure we are in the correct directory
-    local PROJECT_DIR
-    PROJECT_DIR=$(find_project_directory)
-    cd "$PROJECT_DIR" || error "Unable to change to project directory"
-    
-    # Create .env file if it doesn't exist
-    log "Project directory is: $PROJECT_DIR"
-    
-    # Debugging: check if we can write to the directory
-    if [ ! -w "$PROJECT_DIR" ]; then
-        error "Cannot write to project directory. Check permissions."
-    fi
-
-    # Create .env file with explicit path
-    ENV_PATH="$PROJECT_DIR/.env"
-    
-    if [ ! -f "$ENV_PATH" ]; then
-        log "Creating .env file at $ENV_PATH..."
-        cat > "$ENV_PATH" << EOL
-# CrowdSec Metrics Dashboard Configuration
-
-# Server Configuration
-PORT=47392
-HOST=localhost
-
-# CrowdSec Configuration
-CROWDSEC_CONTAINER=crowdsec
-
-# Logging Configuration
-LOG_LEVEL=info
-
-# Security Settings
-CORS_ORIGIN=*
-
-# Optional: Additional Configuration
-# METRICS_INTERVAL=60
-# DEBUG=false
-EOL
-        
-        # Verify file creation
-        if [ ! -f "$ENV_PATH" ]; then
-            error "Failed to create .env file at $ENV_PATH"
-        fi
-        
-        # Set proper permissions
-        chmod 644 "$ENV_PATH"
-    fi
-    
-    # Select port
-    PORT=$(select_port)
-    
-    # Detect server IP
-    HOST=$(detect_server_ip)
-    
-    # Update .env file
-    sed -i "s/PORT=.*/PORT=$PORT/" "$ENV_PATH"
-    sed -i "s/HOST=.*/HOST=$HOST/" "$ENV_PATH"
-    
-    # Set CrowdSec container name
-    sed -i "s/CROWDSEC_CONTAINER=.*/CROWDSEC_CONTAINER=crowdsec/" "$ENV_PATH"
-    
-    # Display file contents for verification
-    log "Created .env file contents:"
-    cat "$ENV_PATH"
-    
-    success "Environment configured successfully"
-}
-
 # Setup systemd service
 setup_systemd_service() {
     local PROJECT_DIR
@@ -481,36 +465,6 @@ main() {
     install_dependencies
     clone_repository
     install_project_dependencies
-    
-    # Explicitly create .env file
-    log "Ensuring .env file exists..."
-    PROJECT_DIR=$(find_project_directory)
-    cd "$PROJECT_DIR"
-    
-    if [ ! -f .env ]; then
-        log "Creating default .env file..."
-        cat > .env << EOL
-# CrowdSec Metrics Dashboard Configuration
-
-# Server Configuration
-PORT=47392
-HOST=localhost
-
-# CrowdSec Configuration
-CROWDSEC_CONTAINER=crowdsec
-
-# Logging Configuration
-LOG_LEVEL=info
-
-# Security Settings
-CORS_ORIGIN=*
-
-# Optional: Additional Configuration
-# METRICS_INTERVAL=60
-# DEBUG=false
-EOL
-    fi
-    
     configure_environment
     setup_systemd_service
     configure_firewall
