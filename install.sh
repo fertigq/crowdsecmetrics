@@ -48,21 +48,78 @@ detect_os() {
     fi
 }
 
-# Validate system requirements
+# Install Node.js and npm with robust dependency handling
+install_nodejs() {
+    log "Installing Node.js and npm..."
+    
+    # Attempt to fix broken packages first
+    apt-get update
+    apt-get install -f
+
+    # Remove conflicting packages
+    apt-get remove -y nodejs npm node-gyp
+
+    # Install required dependencies
+    apt-get install -y curl software-properties-common
+
+    # Clean up any existing Node.js repositories
+    rm -f /etc/apt/sources.list.d/*nodesource*
+
+    # Install NodeSource repository and Node.js
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+
+    # Install Node.js with all dependencies
+    apt-get install -y --no-install-recommends nodejs
+
+    # Verify and display versions
+    log "Node.js version: $(node --version)"
+    log "npm version: $(npm --version)"
+
+    # Install npm globally with recommended packages
+    npm install -g npm@latest
+}
+
+# Validate system requirements with enhanced error handling
 validate_requirements() {
-    # Check Node.js
-    if ! command -v node &> /dev/null; then
-        error "Node.js is not installed. Please install Node.js 16+ first."
+    # Comprehensive Node.js and npm check
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+        warning "Node.js or npm not found. Attempting comprehensive installation..."
+        install_nodejs
+    else
+        # Check Node.js version
+        NODE_VERSION=$(node --version | cut -d'.' -f1 | sed 's/v//')
+        if [[ "$NODE_VERSION" -lt 16 ]]; then
+            warning "Node.js version is too old. Upgrading..."
+            install_nodejs
+        fi
     fi
 
-    # Check npm
-    if ! command -v npm &> /dev/null; then
-        error "npm is not installed. Please install npm first."
-    fi
-
-    # Check CrowdSec
+    # CrowdSec check remains the same
     if ! command -v cscli &> /dev/null; then
         error "CrowdSec is not installed. Please install CrowdSec first."
+    fi
+}
+
+# Install system dependencies with fallback
+install_dependencies() {
+    log "Installing system dependencies..."
+    
+    # Ensure package lists are up to date
+    apt-get update
+
+    # Install core dependencies
+    apt-get install -y \
+        git \
+        nginx \
+        curl \
+        software-properties-common \
+        ca-certificates \
+        gnupg \
+        lsb-release
+
+    # Additional error handling for dependency installation
+    if [ $? -ne 0 ]; then
+        error "Failed to install system dependencies. Please check your package manager."
     fi
 }
 
@@ -102,24 +159,6 @@ detect_server_ip() {
     read -p "Enter server IP (default: $SERVER_IP): " USER_IP
     SERVER_IP=${USER_IP:-$SERVER_IP}
     echo "$SERVER_IP"
-}
-
-# Install system dependencies
-install_dependencies() {
-    log "Installing system dependencies..."
-    case "$OS" in
-        "Ubuntu"|"Debian GNU/Linux")
-            apt-get update
-            apt-get install -y nodejs npm nginx git
-            ;;
-        "CentOS Linux"|"Red Hat Enterprise Linux")
-            yum update
-            yum install -y nodejs npm nginx git
-            ;;
-        *)
-            error "Unsupported operating system: $OS"
-            ;;
-    esac
 }
 
 # Clone the repository
