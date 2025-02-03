@@ -227,7 +227,7 @@ install_project_dependencies() {
     # Ensure configuration files exist
     if [ ! -f "postcss.config.js" ]; then
         log "Creating postcss.config.js..."
-        cat > postcss.config.js << EOL
+        cat > postcss.config.js << 'EOL'
 export default {
   plugins: {
     tailwindcss: {},
@@ -239,7 +239,7 @@ EOL
 
     if [ ! -f "tailwind.config.js" ]; then
         log "Creating tailwind.config.js..."
-        cat > tailwind.config.js << EOL
+        cat > tailwind.config.js << 'EOL'
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -332,4 +332,44 @@ configure_firewall() {
     
     log "Configuring firewall..."
     if command -v ufw &> /dev/null; then
-        ufw allow "$
+        ufw allow "$PORT/tcp"
+    elif command -v firewall-cmd &> /dev/null; then
+        firewall-cmd --permanent --add-port="$PORT/tcp"
+        firewall-cmd --reload
+    else
+        warning "No firewall utility found. Please manually configure firewall."
+    fi
+}
+
+# Main installation process
+main() {
+    # Clear the screen for a clean installation view
+    clear
+    
+    log "🚀 CrowdSec Metrics Dashboard Installer 🚀"
+    log "----------------------------------------"
+    
+    # Run installation steps
+    check_sudo
+    detect_os
+    validate_requirements
+    install_dependencies
+    clone_repository
+    install_project_dependencies
+    configure_environment
+    setup_systemd_service
+    configure_firewall
+    
+    # Final success message
+    echo ""
+    success "Installation completed successfully!"
+    echo "Dashboard URL: http://$(grep HOST .env | cut -d '=' -f2):$(grep PORT .env | cut -d '=' -f2)"
+    echo ""
+    echo "Useful commands:"
+    echo "  View service status: systemctl status crowdsecmetrics"
+    echo "  Stop service: systemctl stop crowdsecmetrics"
+    echo "  Start service: systemctl start crowdsecmetrics"
+}
+
+# Run the main installation function
+main
